@@ -45,7 +45,6 @@ class DDPG:
 
         # Initialize Actor network and its target network. Should be named self.Actor
         self.Critic = CriticNetwork(self.obs_dim, self.act_dim).to(device)
-        self.Critic.initialize_weights()
         self.Critic_target = CriticNetwork(self.obs_dim, self.act_dim).to(device)
         copy_target(self.Critic, self.Critic_target)
         self.Actor = ActorNetwork(self.obs_dim, self.act_dim).to(device)
@@ -108,27 +107,26 @@ class DDPG:
                 # Batch is sampled from the replay buffer and containes a list of tuples (s, a, r, s', term, trunc)
 
                 batch = self.replay_buffer.get(self.batch_size)
-                
-                # Compute the loss for the critic and update the critic network
+                # Compute the loss for the critic and update the critic network 
+                critic_loss = self.compute_critic_loss(batch) 
                 self.optim_dqn.zero_grad()
-                critic_loss = self.compute_critic_loss(batch)
+                # Compute the loss for the actor and update the actor network 
                 critic_loss.backward()
                 self.optim_dqn.step()
                 
-                # Compute the loss for the actor and update the actor network
-                self.optim_actor.zero_grad()
                 actor_loss = self.compute_actor_loss(batch)
+                self.optim_actor.zero_grad()
                 actor_loss.backward()
                 self.optim_actor.step()
 
                 # END TODO (6)
 
-                # TODO (7): Sync the target networks with soft updates and tau=0.001 according to details of the DDPG paper
-                with torch.no_grad():
-                    soft_update(self.Critic, self.Critic_target, tau=0.001)
-                    soft_update(self.Actor, self.Actor_target, tau=0.001)
+            # TODO (7): Sync the target networks with soft updates and tau=0.001 according to details of the DDPG paper
+            with torch.no_grad():
+                soft_update(self.Critic_target, self.Critic, tau=0.001)
+                soft_update(self.Actor_target, self.Actor, tau=0.001)
 
-                # END TODO (7)
+            # END TODO (7)
 
             if timestep % (timesteps-1) == 0:
                 episode_reward_plot(all_rewards, timestep, window_size=7, step_size=1)
@@ -169,13 +167,14 @@ class DDPG:
         terminated_batch = torch.FloatTensor(terminated_batch).to(device).unsqueeze(1)
         truncated_batch = torch.FloatTensor(truncated_batch).to(device).unsqueeze(1)
 
-        q_expected = self.Critic(state_batch, action_batch) 
+        
 
         with torch.no_grad():
-            next_action = self.Actor_target(next_state_batch).to(device) 
+            next_action = self.Actor_target(next_state_batch)
             q_targets_next = self.Critic_target(next_state_batch, next_action)                                          
 
-            target = reward_batch + (1-(terminated_batch)) * (1-(truncated_batch)) *self.gamma*q_targets_next
+            target = reward_batch + (1-terminated_batch) * (1-truncated_batch) * self.gamma * q_targets_next
+        q_expected = self.Critic(state_batch, action_batch) 
         criterion = nn.MSELoss()
 
         loss = criterion(q_expected, target)
@@ -193,12 +192,12 @@ class DDPG:
         """
         # TODO (5) implement the actor loss. You have to sample from the replay buffer first a set of states.
 
-        state_batch, _, reward_batch, next_state_batch, terminated_batch, truncated_batch = batch # self.replay_buffer.get(self.batch_size)
+        state_batch, _, _, _, _, _ = batch
 
         state_batch = torch.FloatTensor(state_batch).to(device)
         
-        action_batch = self.Actor(state_batch) # ac.pi(o)
-        loss = - torch.mean(self.Critic(state_batch, action_batch)) # Critic target, q_pi
+        action_batch = self.Actor(state_batch)
+        loss = -torch.mean(self.Critic(state_batch, action_batch))
 
 
         # END TODO (5) 
