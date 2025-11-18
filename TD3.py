@@ -43,7 +43,7 @@ class TD3:
         copy_target(self.Actor, self.Actor_target)
 
         q_params = itertools.chain(self.Critic1.parameters(), self.Critic2.parameters())
-        self.optim_critic = optim.Adam(q_params, lr=0.001, weight_decay=0.01) 
+        self.optim_critic = optim.Adam(q_params, lr=0.001) 
         self.optim_actor = optim.Adam(self.Actor.parameters(), lr=0.0001)   
 
 
@@ -100,10 +100,11 @@ class TD3:
                     for param in self.Critic2.parameters():
                         param.requires_grad = True
 
-            with torch.no_grad():
-                soft_update(self.Critic1, self.Critic1_target, tau=0.005)
-                soft_update(self.Critic2, self.Critic2_target, tau=0.005)
-                soft_update(self.Actor, self.Actor_target, tau=0.005)
+                    # Soft update target networks (only when actor is updated)
+                    with torch.no_grad():
+                        soft_update(self.Critic1_target, self.Critic1, tau=0.005)
+                        soft_update(self.Critic2_target, self.Critic2, tau=0.005)
+                        soft_update(self.Actor_target, self.Actor, tau=0.005)
 
             if timestep % (timesteps-1) == 0:
                 episode_reward_plot(all_rewards, timestep, window_size=7, step_size=1)
@@ -135,8 +136,9 @@ class TD3:
 
         with torch.no_grad():
             next_action = self.Actor_target(next_state_batch)
+            # Target policy smoothing: add clipped Gaussian noise
             target_noise = NormalActionNoise(np.zeros(self.act_dim), sigma=self.policy_noise * np.ones(self.act_dim))
-            noise = target_noise.sample()
+            noise = np.array([target_noise.sample() for _ in range(len(next_state_batch))])
             noise = np.clip(noise, -self.noise_clip, self.noise_clip)
             noise = torch.FloatTensor(noise).to(device)
             next_action = torch.clamp(next_action + noise, -1, 1)
