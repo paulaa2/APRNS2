@@ -11,6 +11,7 @@ import gymnasium as gym
 from gymnasium.wrappers import RecordVideo
 import itertools
 
+#funcionaaaaa
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -193,3 +194,4 @@ if __name__ == '__main__':
     env = RecordVideo(gym.make("LunarLander-v3", continuous=True, render_mode='rgb_array'), 'video_td3')    
     video_agent(env, td3, n_episodes=5)  
     pass
+
