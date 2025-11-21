@@ -32,16 +32,18 @@ class TD3:
         self.total_iterations = 0        
 
         self.Critic1 = CriticNetwork(self.obs_dim, self.act_dim).to(device)
+        self.Critic1.initialize_weights()
         self.Critic1_target = CriticNetwork(self.obs_dim, self.act_dim).to(device)
-        copy_target(self.Critic1, self.Critic1_target)
+        copy_target(self.Critic1_target, self.Critic1)
         
         self.Critic2 = CriticNetwork(self.obs_dim, self.act_dim).to(device)
+        self.Critic2.initialize_weights()
         self.Critic2_target = CriticNetwork(self.obs_dim, self.act_dim).to(device)
-        copy_target(self.Critic2, self.Critic2_target)
+        copy_target(self.Critic2_target, self.Critic2)
 
         self.Actor = ActorNetwork(self.obs_dim, self.act_dim).to(device)
         self.Actor_target = ActorNetwork(self.obs_dim, self.act_dim).to(device)
-        copy_target(self.Actor, self.Actor_target)
+        copy_target(self.Actor_target, self.Actor)
 
         q_params = itertools.chain(self.Critic1.parameters(), self.Critic2.parameters())
         self.optim_critic = optim.Adam(q_params, lr=0.001) 
@@ -86,20 +88,11 @@ class TD3:
 
                 self.total_iterations += 1
                 if self.total_iterations % self.policy_delay == 0:
-                    for param in self.Critic1.parameters():
-                        param.requires_grad = False
-                    for param in self.Critic2.parameters():
-                        param.requires_grad = False
-                    
+                    # Update actor network
                     self.optim_actor.zero_grad()
                     actor_loss = self.compute_actor_loss(batch)
                     actor_loss.backward()
                     self.optim_actor.step()
-                    
-                    for param in self.Critic1.parameters():
-                        param.requires_grad = True
-                    for param in self.Critic2.parameters():
-                        param.requires_grad = True
 
                     # Soft update target networks (only when actor is updated)
                     with torch.no_grad():
